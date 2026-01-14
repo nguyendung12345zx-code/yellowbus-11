@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magic Learning Pro (V24)</title>
+    <style>
+        /* === 1. 全局基础 === */
+        :root { --primary: #2979FF; --bg-grey: #F5F7FA; --text-main: #333; --green: #4CAF50; }
+        body { margin: 0; font-family: "Comic Sans MS", -apple-system, sans-serif; background: var(--bg-grey); height: 100vh; overflow: hidden; display: flex; flex-direction: column; color: var(--text-main); }
+        
+        /* === 2. 顶部导航栏 (Header) === */
+        header { 
+            height: 50px; background: white; border-bottom: 1px solid #E0E0E0; 
+            display: flex; align-items: center; justify-content: space-between; padding: 0 15px; 
+            flex-shrink: 0; z-index: 100;
+        }
+        .header-left, .header-right { display: flex; align-items: center; gap: 8px; }
+        
+        .back-btn { border: 1px solid #ddd; background: white; padding: 5px 12px; border-radius: 20px; cursor: pointer; color: #555; font-size: 13px; white-space: nowrap; }
+        
+        .speed-btn { 
+            border: 1px solid #ddd; background: #f9f9f9; padding: 4px 8px; border-radius: 4px; 
+            cursor: pointer; font-size: 12px; min-width: 32px; transition: 0.2s;
+        }
+        .speed-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        /* 手机上隐藏 "语速" 文字，省空间 */
+        .speed-label { font-size: 12px; color: #888; display: none; margin-right: 5px; }
+
+        #play-all-btn {
+            background: var(--green); color: white; border: 1px solid var(--green); 
+            font-weight: bold; padding: 5px 12px; font-size: 12px; display: flex; align-items: center; gap: 4px; white-space: nowrap; border-radius: 4px; cursor: pointer;
+        }
+        #play-all-btn.playing { background: #E53935; border-color: #E53935; }
+
+        /* === 3. 主容器 (自适应核心) === */
+        #main-container { 
+            display: flex; 
+            flex: 1; 
+            overflow: hidden; 
+            flex-direction: column; /* 默认：手机/平板竖屏为垂直布局 */
+            position: relative;
+        }
+
+        /* --- A. 左栏 (图片) --- */
+        #col-left { 
+            flex: 0 0 35%; /* 手机占高度的 35% */
+            background: #ffffff; 
+            display: flex; align-items: center; justify-content: center;
+            padding: 10px; box-sizing: border-box; border-bottom: 1px solid #eee;
+            position: relative;
+        }
+        #scene-img { 
+            width: 100%; height: 100%; object-fit: contain; 
+            border-radius: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.05));
+            transition: opacity 0.2s;
+        }
+
+        /* --- B. 中栏 (文字) --- */
+        #col-mid { 
+            flex: 1; /* 自动占据剩余空间 */
+            background: var(--bg-grey); 
+            overflow-y: auto; padding: 15px; 
+            scroll-behavior: smooth;
+        }
+
+        /* --- C. 右栏 (单词) --- */
+        #col-right { 
+            display: flex; flex-direction: column;
+            flex: 0 0 25%; /* 手机占高度的 25% */
+            background: white; 
+            border-top: 2px solid #FFD54F; /* 黄色分割线 */
+            z-index: 10;
+        }
+
+        /* === 4. 电脑 & 平板横屏 (Media Query) === */
+        /* 当屏幕宽度大于 1024px 时 (iPad Pro 横屏、笔记本、台式机) */
+        @media (min-width: 1024px) {
+            header { height: 60px; padding: 0 25px; }
+            .speed-label { display: inline; } /* 电脑上显示“语速”二字 */
+
+            #main-container { flex-direction: row; } /* 变为横向排列 */
+
+            /* 左栏变宽 */
+            #col-left { 
+                flex: 0 0 40%; /* 宽度占 40% */
+                height: 100%; 
+                border-right: 1px solid #ddd; border-bottom: none;
+                padding: 30px; /* 电脑上留白更多更好看 */
+            }
+            #scene-img { 
+                filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1)); /* 电脑上阴影加重 */
+            }
+
+            /* 中栏 */
+            #col-mid { 
+                flex: 1; height: 100%; 
+                border-right: 1px solid #ddd; 
+                padding: 30px; /* 增加内边距 */
+            }
+
+            /* 右栏 */
+            #col-right { 
+                flex: 0 0 320px; /* 固定宽度 320px */
+                height: 100%; border-top: none; 
+            }
+        }
+
+        /* === 内容组件样式 === */
+        
+        /* 文本卡片 */
+        .script-card {
+            background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 2px solid transparent; cursor: pointer; transition: all 0.2s;
+        }
+        .script-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .script-card.active { border-color: var(--primary); background: #E3F2FD; transform: scale(1.01); }
+        
+        .en-text { font-size: 19px; font-weight: 600; line-height: 1.6; margin-bottom: 8px; color: #222; }
+        .cn-text { font-size: 15px; color: #666; margin-bottom: 4px; }
+        
+        .highlight-word { 
+            color: #00897B; border-bottom: 2px solid #4DB6AC; padding-bottom: 1px;
+            cursor: pointer; transition: 0.2s; 
+        }
+        .highlight-word:hover { background: #B2DFDB; border-radius: 4px; color: #004D40; }
+
+        /* 单词列表 */
+        .vocab-header { padding: 12px; background: #FAFAFA; font-weight: bold; font-size: 14px; color: #555; border-bottom: 1px solid #eee; text-align: center; }
+        .vocab-list { flex: 1; overflow-y: auto; padding: 12px; }
+        
+        .vocab-card { 
+            border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; 
+            background: #fff; border-left: 4px solid #ddd; position: relative; cursor: pointer;
+        }
+        .vocab-card.focused { border-left-color: #FF9800 !important; background-color: #FFF3E0 !important; }
+        .vocab-top { display: flex; justify-content: space-between; align-items: center; }
+        .vocab-word { font-size: 18px; font-weight: bold; color: #333; }
+        
+        .vocab-mask { margin-top: 8px; font-size: 12px; color: #999; background: #f9f9f9; padding: 4px; text-align: center; border-radius: 4px; }
+        .vocab-reveal { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #eee; font-size: 14px; color: #444; }
+        .vocab-card.revealed .vocab-mask { display: none; }
+        .vocab-card.revealed .vocab-reveal { display: block; animation: fadeIn 0.3s; }
+        .vocab-card.revealed { border-left-color: #4CAF50; }
+        .pos-tag { background: #FFECB3; color: #E65100; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+
+        /* 互动题 */
+        .section-divider { text-align: center; margin: 40px 0 20px 0; color: #999; font-size: 13px; letter-spacing: 1px; }
+        .quiz-card { background: #FFF8E1; border-radius: 12px; padding: 18px; margin-bottom: 20px; border: 2px dashed #FFD54F; }
+        .quiz-title { font-weight: bold; color: #F57C00; margin-bottom: 12px; font-size: 15px; }
+        .quiz-opt { 
+            background: white; border: 1px solid #FFE082; padding: 12px; border-radius: 8px; margin-bottom: 10px; 
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.1s;
+        }
+        .quiz-opt:active { background: #FFECB3; }
+        .quiz-opt.correct { background: #C8E6C9; border-color: #4CAF50; color: #1B5E20; font-weight: bold; }
+        .quiz-opt.wrong { background: #FFCDD2; border-color: #E53935; color: #B71C1C; }
+
+        /* 错误提示 */
+        #error-msg { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); text-align:center; width: 100%; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen" style="padding:40px; text-align:center; height:100vh; background:var(--bg-grey); box-sizing:border-box; overflow-y:auto;">
+        <h2 style="color:#2E7D32; margin-bottom:30px;">📚 Magic English Library</h2>
+        <div onclick="openBook()" style="background:white; display:inline-block; padding:20px; border-radius:20px; cursor:pointer; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:200px; transition:transform 0.2s;">
+            <img src="https://via.placeholder.com/200x200/FDD835/FFFFFF?text=Start" style="border-radius:15px; margin-bottom:15px; width:100%;">
+            <h3 style="margin:0; font-size:18px;">The Yellow Bus</h3>
+            <p style="color:#888; font-size:13px; margin-top:8px;">V24 全平台适配版</p>
+        </div>
+    </div>
+
+    <div id="learning-screen" style="display:none; height:100vh; flex-direction:column;">
+        <header>
+            <div class="header-left">
+                <button class="back-btn" onclick="location.reload()">⬅ 书架</button>
+            </div>
+            
+            <div class="header-right">
+                <span class="speed-label">语速:</span>
+                <button class="speed-btn" onclick="setSpeed(0.5)">0.5</button>
+                <button class="speed-btn" onclick="setSpeed(0.75)">0.75</button>
+                <button class="speed-btn active" onclick="setSpeed(1.0)">1.0</button>
+                <button class="speed-btn" onclick="setSpeed(1.25)">1.25</button>
+                <button id="play-all-btn" onclick="toggleAutoPlay()">▶ 全文</button>
+            </div>
+        </header>
+
+        <div id="main-container">
+            <div id="col-left">
+                <img id="scene-img" src="" alt="Scene" onerror="this.style.display='none'; document.getElementById('error-msg').style.display='block';">
+                
+                <div id="error-msg" style="display:none;">
+                    <div style="font-size:30px;">🖼️</div>
+                    <p style="font-size:12px; color:#999; margin-top:5px;">图片未加载<br>请检查 images 文件夹</p>
+                </div>
+            </div>
+
+            <div id="col-mid"></div>
+
+            <div id="col-right">
+                <div class="vocab-header">🔑 核心词汇 (点击绿字查看)</div>
+                <div class="vocab-list" id="vocab-container"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ==========================================
+    // 数据源
+    // ==========================================
+    const storyData = {
+        title: "The Yellow Bus",
+        paragraphs: [
+            {
+                text: "I go to {school} by the {yellow} {bus} every {morning}. It is a {big} and {long} car.",
+                cn: "我每天早上坐黄色校车去上学。它是一辆又大又长的车。",
+                img: "images/story001_yellowbus/p1.jpg", 
+                vocab: { 
+                    "school": { ph: "/skuːl/", pos: "n.", cn: "学校" },
+                    "yellow": { ph: "/ˈjel.oʊ/", pos: "adj.", cn: "黄色的" },
+                    "bus": { ph: "/bʌs/", pos: "n.", cn: "公共汽车" },
+                    "morning": { ph: "/ˈmɔːr.nɪŋ/", pos: "n.", cn: "早晨" },
+                    "big": { ph: "/bɪɡ/", pos: "adj.", cn: "大的" },
+                    "long": { ph: "/lɑːŋ/", pos: "adj.", cn: "长的" }
+                }
+            },
+            {
+                text: "The {driver} is Mr. Brown. He is very {nice} to us.",
+                cn: "司机是布朗先生，他对我们很友善。",
+                img: "images/story001_yellowbus/p2.jpg",
+                vocab: { 
+                    "driver": { ph: "/ˈdraɪ.vɚ/", pos: "n.", cn: "司机" },
+                    "nice": { ph: "/naɪs/", pos: "adj.", cn: "友好的" }
+                }
+            },
+            {
+                text: "I {wait} for the bus at the bus {stop}. When the {door} {opens}, I see my {friends} {inside}.",
+                cn: "我在车站等车。当车门打开时，我看到我的朋友们在里面。",
+                img: "images/story001_yellowbus/p3.jpg",
+                vocab: { 
+                    "wait": { ph: "/weɪt/", pos: "v.", cn: "等待" },
+                    "stop": { ph: "/stɑːp/", pos: "n.", cn: "车站" },
+                    "door": { ph: "/dɔːr/", pos: "n.", cn: "门" },
+                    "opens": { ph: "/ˈoʊ.pənz/", pos: "v.", cn: "打开" },
+                    "friends": { ph: "/frendz/", pos: "n.", cn: "朋友" },
+                    "inside": { ph: "/ɪnˈsaɪd/", pos: "adv.", cn: "在里面" }
+                }
+            },
+            {
+                text: "We {sit} together and {look} out the {window}. We {talk} and {laugh} {happily}.",
+                cn: "我们坐在一起看窗外。我们开心地说话大笑。",
+                img: "images/story001_yellowbus/p4.jpg",
+                vocab: { 
+                    "sit": { ph: "/sɪt/", pos: "v.", cn: "坐" },
+                    "look": { ph: "/lʊk/", pos: "v.", cn: "看" },
+                    "window": { ph: "/ˈwɪn.doʊ/", pos: "n.", cn: "窗户" },
+                    "talk": { ph: "/tɑːk/", pos: "v.", cn: "说话" },
+                    "laugh": { ph: "/læf/", pos: "v.", cn: "笑" },
+                    "happily": { ph: "/ˈhæp.əl.i/", pos: "adv.", cn: "快乐地" }
+                }
+            },
+            {
+                text: "The bus ride is {safe} and {fun}. I {love} the yellow bus.",
+                cn: "坐校车既安全又有趣。我爱黄色校车。",
+                img: "images/story001_yellowbus/p5.jpg",
+                vocab: { 
+                    "safe": { ph: "/seɪf/", pos: "adj.", cn: "安全的" },
+                    "fun": { ph: "/fʌn/", pos: "adj.", cn: "有趣的" },
+                    "love": { ph: "/lʌv/", pos: "v.", cn: "爱" }
+                }
+            }
+        ],
+        quizzes: [
+            { question: "What color is the bus?", options: ["Red", "Yellow", "Blue"], answer: 1 },
+            { question: "Who is the driver?", options: ["Mr. Green", "Mr. Brown", "Mr. Black"], answer: 1 },
+            { question: "Are they happy on the bus?", options: ["Yes", "No"], answer: 0 }
+        ]
+    };
+
+    let currentRate = 1.0;
+    let isAutoPlaying = false; 
+
+    // 初始化
+    function openBook() {
+        document.getElementById('menu-screen').style.display = 'none';
+        document.getElementById('learning-screen').style.display = 'flex';
+        renderContent();
+        activateParagraph(0);
+        
+        // 尝试预热音频引擎 (解决手机静音问题)
+        if(window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            let u = new SpeechSynthesisUtterance('');
+            window.speechSynthesis.speak(u);
+        }
+    }
+
+    function renderContent() {
+        const container = document.getElementById('col-mid');
+        container.innerHTML = "";
+
+        // 渲染正文
+        storyData.paragraphs.forEach((para, idx) => {
+            let card = document.createElement('div');
+            card.className = 'script-card';
+            card.id = `para-${idx}`;
+            
+            card.onclick = (e) => {
+                if(!e.target.classList.contains('highlight-word')) {
+                    stopAutoPlay();
+                    activateParagraph(idx);
+                }
+            };
+
+            let htmlText = para.text.replace(/{(\w+)}/g, (match, word) => {
+                return `<span class="highlight-word" onclick="handleWordClick('${word}', ${idx}, event)">${word}</span>`;
+            });
+
+            card.innerHTML = `<div class="en-text">${htmlText}</div><div class="cn-text">${para.cn}</div>`;
+            container.appendChild(card);
+        });
+
+        // 渲染互动区
+        let divider = document.createElement('div');
+        divider.className = 'section-divider';
+        divider.innerText = "——— ✨ Quiz Time (互动挑战) ✨ ———";
+        container.appendChild(divider);
+
+        storyData.quizzes.forEach((quiz, qIdx) => {
+            let qCard = document.createElement('div');
+            qCard.className = 'quiz-card';
+            qCard.innerHTML = `
+                <div class="quiz-title">Question ${qIdx + 1}</div>
+                <div style="display:flex; align-items:center; margin-bottom:10px;">
+                    <div style="font-weight:bold; flex:1; font-size:16px;">${quiz.question}</div>
+                    <button style="border:none;background:none;font-size:20px;cursor:pointer;" onclick="stopAutoPlay(); speakText('${quiz.question}')">🔊</button>
+                </div>
+                <div>
+                    ${quiz.options.map((opt, oIdx) => `
+                        <div class="quiz-opt" onclick="checkAnswer(this, ${oIdx}, ${quiz.answer}, '${opt}')">
+                            <span>${opt}</span>
+                            <button style="border:none;background:none;font-size:16px;cursor:pointer;" onclick="event.stopPropagation(); stopAutoPlay(); speakText('${opt}')">🔈</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            container.appendChild(qCard);
+        });
+        
+        // 底部留白
+        let spacer = document.createElement('div');
+        spacer.style.height = "60px";
+        container.appendChild(spacer);
+    }
+
+    // 点击单词
+    function handleWordClick(word, paraIdx, event) {
+        event.stopPropagation();
+        stopAutoPlay();
+        activateParagraph(paraIdx, true); 
+
+        const vocabCard = document.getElementById(`vocab-card-${word}`);
+        if(vocabCard) {
+            document.querySelectorAll('.vocab-card').forEach(el => el.classList.remove('focused'));
+            if (!vocabCard.classList.contains('revealed')) vocabCard.classList.add('revealed');
+            vocabCard.classList.add('focused');
+            vocabCard.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+        speakText(word);
+    }
+
+    // 激活段落
+    function activateParagraph(idx, silent = false) {
+        document.querySelectorAll('.script-card').forEach(el => el.classList.remove('active'));
+        const activeCard = document.getElementById(`para-${idx}`);
+        if(activeCard) {
+            activeCard.classList.add('active');
+            activeCard.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+
+        // 切换图片
+        const imgEl = document.getElementById('scene-img');
+        const errorMsg = document.getElementById('error-msg');
+        // 重置状态
+        imgEl.style.display = 'block';
+        errorMsg.style.display = 'none';
+        imgEl.src = storyData.paragraphs[idx].img;
+
+        updateSidebar(idx);
+
+        if (!silent) {
+            let rawText = storyData.paragraphs[idx].text.replace(/{|}/g, "");
+            speakText(rawText);
+        }
+    }
+
+    // 更新单词表
+    function updateSidebar(idx) {
+        const container = document.getElementById('vocab-container');
+        container.innerHTML = "";
+        const vocabMap = storyData.paragraphs[idx].vocab;
+        
+        for (let [word, info] of Object.entries(vocabMap)) {
+            let card = document.createElement('div');
+            card.className = 'vocab-card';
+            card.id = `vocab-card-${word}`;
+            
+            card.onclick = function() {
+                stopAutoPlay();
+                document.querySelectorAll('.vocab-card').forEach(el => el.classList.remove('focused'));
+                this.classList.add('focused');
+                if (!this.classList.contains('revealed')) this.classList.add('revealed');
+                speakText(word);
+            };
+
+            card.innerHTML = `
+                <div class="vocab-top">
+                    <div><span class="vocab-word">${word}</span> <span style="font-size:12px;color:#888;">${info.ph}</span></div>
+                    <button style="border:none;background:none;color:#2979FF;cursor:pointer;" onclick="event.stopPropagation(); stopAutoPlay(); speakText('${word}')">🔊</button>
+                </div>
+                <div class="vocab-mask">点击查看释义</div>
+                <div class="vocab-reveal"><span class="pos-tag">${info.pos}</span> ${info.cn}</div>
+            `;
+            container.appendChild(card);
+        }
+    }
+
+    // 自动播放控制
+    function toggleAutoPlay() {
+        if (isAutoPlaying) stopAutoPlay();
+        else startAutoPlay();
+    }
+
+    function startAutoPlay() {
+        isAutoPlaying = true;
+        const btn = document.getElementById('play-all-btn');
+        btn.innerHTML = "⏹ 停止";
+        btn.classList.add('playing');
+        playNextParagraph(0);
+    }
+
+    function stopAutoPlay() {
+        isAutoPlaying = false;
+        window.speechSynthesis.cancel();
+        const btn = document.getElementById('play-all-btn');
+        btn.innerHTML = "▶ 全文";
+        btn.classList.remove('playing');
+    }
+
+    function playNextParagraph(idx) {
+        if (!isAutoPlaying || idx >= storyData.paragraphs.length) {
+            stopAutoPlay();
+            return;
+        }
+        activateParagraph(idx); 
+        
+        let rawText = storyData.paragraphs[idx].text.replace(/{|}/g, "");
+        window.speechSynthesis.cancel();
+        let u = new SpeechSynthesisUtterance(rawText);
+        u.lang = 'en-US';
+        u.rate = currentRate;
+        u.onend = () => {
+             if(isAutoPlaying) setTimeout(() => playNextParagraph(idx + 1), 600);
+        };
+        window.speechSynthesis.speak(u);
+    }
+
+    // 答题
+    window.checkAnswer = function(el, selIdx, ansIdx, text) {
+        stopAutoPlay(); 
+        speakText(text);
+        if(selIdx === ansIdx) el.classList.add('correct');
+        else el.classList.add('wrong');
+    }
+
+    // 设置
+    function setSpeed(rate) {
+        currentRate = rate;
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            if (parseFloat(btn.innerText) === rate) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+    }
+
+    function speakText(text) {
+        window.speechSynthesis.cancel();
+        let u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US';
+        u.rate = currentRate; 
+        window.speechSynthesis.speak(u);
+    }
+</script>
+</body>
+</html>
